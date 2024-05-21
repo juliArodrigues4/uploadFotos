@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 export default function Home() {
     
     const [ image, setImage ] = useState("");
-    const [ file, setFile ]   = useState("");
+    const [ file, setFile ]   = useState([]);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(firebd, "julinhafts"), (snapshot) => {
@@ -23,34 +23,38 @@ export default function Home() {
 }, []);
 
 async function uploadImage(uri, fileType){
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, "images/" + fileType); // Criar uma referência não raiz usando 'child()'
-    const uploadTask = uploadBytesResumable(storageRef, blob);
+    try {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const storageRef = ref(storage, "images/" + new Date().toISOString()); // Criar uma referência não raiz usando 'child()'
+        const uploadTask = uploadBytesResumable(storageRef, blob);
 
-    uploadTask.on(
-        "state_changed",
-        null,
-        (error)=>{
-            console.error(error);
-        },
-        async () => {
-           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-           await saveRecord(fileType, downloadURL, new Date().toISOString());
-           setImage("");
-        }    
-    );
+        uploadTask.on(
+            "state_changed",
+            null,
+            (error) => {
+                console.error(error);
+            },
+            async () => {
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                await saveRecord(fileType, downloadURL, new Date().toISOString());
+                setImage("");
+            }
+        );
+    } catch (error) {
+        console.error("Erro ao carregar a imagem:", error);
+    }
 }
 
 async function saveRecord(fileType, url, createAt){
-    try{
+    try {
         await addDoc(collection(firebd, "julinhafts"), {
             fileType,
             url,
             createAt,
         });
         console.log("Registro salvo com sucesso no Firestore!");
-    } catch(error) {
+    } catch (error) {
         console.error("Erro ao salvar registro no Firestore:", error);
     }
 }
@@ -65,8 +69,9 @@ async function saveRecord(fileType, url, createAt){
         });
         
         if (!result.canceled) {
-          setImage(result.assets[0].uri);
-          await uploadImage(result.assets[0].uri, "image");
+            const {uri} = result.assets[0];
+          setImage(uri);
+          await uploadImage(uri, "image");
         }
       };
 
